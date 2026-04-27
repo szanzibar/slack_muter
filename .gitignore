@@ -39,4 +39,8 @@ npm-debug.log
 # committed template with empty values.
 /.env
 
+# Slack event logs (bind-mounted into the container)
+/logs/
+/log/
+
 .dexter.db*

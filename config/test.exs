@@ -7,6 +7,11 @@ config :slack_bot, SlackBotWeb.Endpoint,
   secret_key_base: "SqB9MHVzJ4qzqsud3z3Bw8HxS57ZxD+d9l+W/b0Iqru1aYt8hxvAP2B8ZskN8wlU",
   server: false
 
+# Keep event-log files out of the project dir during tests.
+config :slack_bot,
+       :event_log_dir,
+       Path.join(System.tmp_dir!(), "slack_bot_test_logs")
+
 # In test we don't send emails
 config :slack_bot, SlackBot.Mailer, adapter: Swoosh.Adapters.Test
 

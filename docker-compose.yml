@@ -16,3 +16,8 @@ services:
       # Compose reads .env for ${PORT} interpolation. This is the host port
       # the reverse proxy points at; the container side is always 4000.
       - "${PORT:-4000}:4000"
+    volumes:
+      # Persist Slack event logs to the host so rebuilds don't nuke them
+      # and you can `tail -f` from the host. The container writes as
+      # `nobody` (UID 65534) — deploy.sh ensures the host dir is writable.
+      - ./logs:/app/log

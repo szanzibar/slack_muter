@@ -10,6 +10,11 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
+# Bind-mounted logs dir must be writable by the container user (nobody).
+# Permissive mode here is fine — it's a logs directory, not secrets.
+mkdir -p logs
+chmod 777 logs
+
 echo "==> git pull"
 git pull --ff-only
 
