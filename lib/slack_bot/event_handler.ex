@@ -21,7 +21,7 @@ defmodule SlackBot.EventHandler do
 
   require Logger
 
-  alias SlackBot.SlackClient
+  alias SlackBot.{EventLogger, SlackClient}
 
   # Hard cap on how many "between" messages we'll inspect for the race-aware
   # check. If there's a burst of >@history_limit unread messages from the
@@ -30,8 +30,10 @@ defmodule SlackBot.EventHandler do
   @history_limit 20
 
   @spec handle_message(map()) :: :ok
-  def handle_message(%{"channel" => channel, "ts" => event_ts} = _event) do
+  def handle_message(%{"channel" => channel, "ts" => event_ts} = event) do
     with {:ok, info} <- SlackClient.conversations_info(channel),
+         :ok <- check_is_member(info),
+         :ok <- log_member_event(event),
          {:ok, last_read} <- fetch_last_read(info),
          :continue <- compare_ts(last_read, event_ts),
          {:ok, between} <-
@@ -50,6 +52,10 @@ defmodule SlackBot.EventHandler do
       :skip_already_read ->
         :ok
 
+      :skip_not_member ->
+        Logger.debug("skipping #{channel}: not a member")
+        :ok
+
       :skip_other_user_unread ->
         Logger.debug("skipping #{channel}@#{event_ts}: non-target unread content present")
         :ok
@@ -64,6 +70,22 @@ defmodule SlackBot.EventHandler do
     do: {:ok, last_read}
 
   defp fetch_last_read(_), do: {:error, :no_last_read}
+
+  # `is_member` is reliable for public channels (false → user has read
+  # access but isn't actually in the channel; we should ignore those).
+  # Private channels and groups don't always populate `is_member`, but
+  # `conversations.info` only succeeds for those when the calling user
+  # is in fact a member, so a missing key is treated as "in".
+  defp check_is_member(%{"is_member" => false}), do: :skip_not_member
+  defp check_is_member(_info), do: :ok
+
+  # Audit-log the event only after we've confirmed the calling user is a
+  # member of the channel. Side-effecting; always returns :ok so the with
+  # chain treats this as a non-branching step.
+  defp log_member_event(event) do
+    EventLogger.log_event(event)
+    :ok
+  end
 
   # Slack ts strings sort lexicographically when zero-padded — they always
   # are (e.g. "1700000000.000123"), so plain string compare is correct.

@@ -18,7 +18,7 @@ defmodule SlackBotWeb.SlackController do
 
   require Logger
 
-  alias SlackBot.{EventHandler, EventLogger}
+  alias SlackBot.EventHandler
 
   @ignored_channel_types ~w(im mpim)
 
@@ -27,8 +27,6 @@ defmodule SlackBotWeb.SlackController do
   end
 
   def events(conn, %{"type" => "event_callback", "event" => event}) do
-    if Map.get(event, "type") == "message", do: EventLogger.log_event(event)
-
     if should_handle?(event, target_user_ids()) do
       Task.Supervisor.start_child(SlackBot.TaskSupervisor, fn ->
         EventHandler.handle_message(event)
