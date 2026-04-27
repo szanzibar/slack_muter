@@ -29,9 +29,17 @@ read it yourself.
 1. Create a new Slack app at <https://api.slack.com/apps> (From scratch),
    pick your workspace.
 2. **OAuth & Permissions → User Token Scopes**:
-   - `channels:history`, `channels:read`
-   - `groups:history`, `groups:read`
+   - `channels:history`, `channels:read`, `channels:write`
+   - `groups:history`, `groups:read`, `groups:write`
    - `im:read` (so we can identify and skip 1:1 DMs in event payloads)
+
+   The `*:write` scopes are required by `conversations.mark` even though
+   we never post messages — Slack treats "mark as read" as a write
+   operation per channel type. If you skip them you'll see
+   `{"ok":false,"error":"missing_scope"}` from `conversations.mark` and
+   the channel will silently never get marked. After adding scopes you
+   must reinstall the app to your workspace and replace
+   `SLACK_USER_TOKEN` with the new `xoxp-…`.
 3. **Event Subscriptions**:
    - Enable, set the **Request URL** to
      `https://YOUR_HOST/slack/events`. Slack pings it with a
