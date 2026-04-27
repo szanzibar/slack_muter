@@ -35,3 +35,8 @@ slack_bot-*.tar
 npm-debug.log
 /assets/node_modules/
 
+# Local environment overrides — secrets, never commit. .env.default is the
+# committed template with empty values.
+/.env
+
+.dexter.db*

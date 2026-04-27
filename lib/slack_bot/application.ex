@@ -11,8 +11,7 @@ defmodule SlackBot.Application do
       SlackBotWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:slack_bot, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: SlackBot.PubSub},
-      # Start a worker by calling: SlackBot.Worker.start_link(arg)
-      # {SlackBot.Worker, arg},
+      {Task.Supervisor, name: SlackBot.TaskSupervisor},
       # Start to serve requests, typically the last entry
       SlackBotWeb.Endpoint
     ]

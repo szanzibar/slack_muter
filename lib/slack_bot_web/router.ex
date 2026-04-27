@@ -14,16 +14,22 @@ defmodule SlackBotWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :slack_events do
+    plug :accepts, ["json"]
+    plug SlackBotWeb.Plugs.VerifySlackSignature
+  end
+
   scope "/", SlackBotWeb do
     pipe_through :browser
 
     get "/", PageController, :home
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", SlackBotWeb do
-  #   pipe_through :api
-  # end
+  scope "/slack", SlackBotWeb do
+    pipe_through :slack_events
+
+    post "/events", SlackController, :events
+  end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:slack_bot, :dev_routes) do

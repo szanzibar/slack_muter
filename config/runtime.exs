@@ -1,5 +1,18 @@
 import Config
 
+# Load .env into System env for non-prod environments. In prod, env vars
+# come from the hosting environment (Docker/Fly/etc.) and .env doesn't ship.
+if config_env() != :prod and File.exists?(".env") do
+  DotenvParser.load_file(".env")
+end
+
+# Slack auto-read configuration. These are read in every environment so
+# tests can override them via System.put_env/2 in setup blocks.
+config :slack_bot, :slack,
+  signing_secret: System.get_env("SLACK_SIGNING_SECRET"),
+  user_token: System.get_env("SLACK_USER_TOKEN"),
+  target_user_id: System.get_env("TARGET_SLACK_USER_ID")
+
 # config/runtime.exs is executed for all environments, including
 # during releases. It is executed after compilation and before the
 # system starts, so it is typically used to load production configuration
