@@ -25,7 +25,7 @@ defmodule SlackBot.EventHandler do
   # check. If there's a burst of >@history_limit unread messages from the
   # target between marks, we'd rather skip-mark and be safe than mark over
   # potentially missed content.
-  @history_limit 50
+  @history_limit 20
 
   @spec handle_message(map()) :: :ok
   def handle_message(%{"channel" => channel, "ts" => event_ts, "user" => user} = _event) do

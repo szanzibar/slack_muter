@@ -22,6 +22,6 @@ echo "==> docker compose build"
 docker compose build
 
 echo "==> docker compose up -d"
-docker compose up -d
+docker compose down && docker compose up -d
 
 echo "==> done. tail logs with: docker compose logs -f"

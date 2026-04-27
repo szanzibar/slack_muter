@@ -58,17 +58,34 @@ defmodule SlackBot.EventLogger do
 
   @impl true
   def init(_opts) do
-    dir = log_dir()
-    File.mkdir_p!(dir)
-    cleanup_old(dir)
+    dir = Path.expand(log_dir())
     schedule_cleanup()
-    {:ok, open_today(dir)}
+
+    state =
+      with :ok <- ensure_dir(dir),
+           :ok <- cleanup_old_safe(dir),
+           {:ok, file_state} <- try_open_today(dir) do
+        Logger.info("EventLogger writing to #{file_state.path}")
+        file_state
+      else
+        {:error, reason} ->
+          Logger.warning(
+            "EventLogger disabled: cannot write to #{dir} (#{inspect(reason)}). " <>
+              "Check bind-mount perms — the container user must be able to write here."
+          )
+
+          %{io: nil, date: nil, path: nil, dir: dir}
+      end
+
+    {:ok, state}
   end
 
   @impl true
+  def handle_cast({:write, _line}, %{io: nil} = state), do: {:noreply, state}
+
   def handle_cast({:write, line}, state) do
     state = ensure_today_file(state)
-    IO.write(state.io, line)
+    if state.io, do: IO.write(state.io, line)
     {:noreply, state}
   end
 
@@ -89,23 +106,51 @@ defmodule SlackBot.EventLogger do
 
   defp schedule_cleanup, do: Process.send_after(self(), :cleanup, @cleanup_interval)
 
+  defp ensure_today_file(%{io: nil, dir: dir} = state) do
+    case try_open_today(dir) do
+      {:ok, fresh} -> fresh
+      {:error, _} -> state
+    end
+  end
+
   defp ensure_today_file(%{date: date} = state) do
     today = Date.utc_today()
 
     if today == date do
       state
     else
-      File.close(state.io)
-      cleanup_old(state.dir)
-      open_today(state.dir)
+      if state.io, do: File.close(state.io)
+      cleanup_old_safe(state.dir)
+
+      case try_open_today(state.dir) do
+        {:ok, fresh} -> fresh
+        {:error, _} -> %{state | io: nil, date: nil, path: nil}
+      end
     end
   end
 
-  defp open_today(dir) do
+  defp ensure_dir(dir) do
+    case File.mkdir_p(dir) do
+      :ok -> :ok
+      {:error, _} = err -> err
+    end
+  end
+
+  defp cleanup_old_safe(dir) do
+    cleanup_old(dir)
+    :ok
+  rescue
+    _ -> :ok
+  end
+
+  defp try_open_today(dir) do
     today = Date.utc_today()
     path = Path.join(dir, "events-#{Date.to_iso8601(today)}.log")
-    {:ok, io} = File.open(path, [:append, :utf8])
-    %{io: io, date: today, path: path, dir: dir}
+
+    case File.open(path, [:append, :utf8]) do
+      {:ok, io} -> {:ok, %{io: io, date: today, path: path, dir: dir}}
+      {:error, _} = err -> err
+    end
   end
 
   @doc false
