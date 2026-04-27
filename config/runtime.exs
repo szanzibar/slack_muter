@@ -13,6 +13,13 @@ config :slack_bot, :slack,
   user_token: System.get_env("SLACK_USER_TOKEN"),
   target_user_id: System.get_env("TARGET_SLACK_USER_ID")
 
+# Absolute path to the event-log directory. Set explicitly in the
+# container (the Phoenix release boots with CWD=/app/bin, which would
+# otherwise misroute the relative default into a non-bind-mounted dir).
+if dir = System.get_env("EVENT_LOG_DIR") do
+  config :slack_bot, :event_log_dir, dir
+end
+
 # config/runtime.exs is executed for all environments, including
 # during releases. It is executed after compilation and before the
 # system starts, so it is typically used to load production configuration

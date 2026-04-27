@@ -12,6 +12,9 @@ services:
       # Container always listens on 4000. PORT in .env is host-side only —
       # this override prevents env_file from leaking it into the container.
       PORT: "4000"
+      # Absolute path matching the bind-mount below. Without this the app
+      # would write to /app/bin/log (CWD-relative) instead of the mount.
+      EVENT_LOG_DIR: /app/log
     ports:
       # Compose reads .env for ${PORT} interpolation. This is the host port
       # the reverse proxy points at; the container side is always 4000.
