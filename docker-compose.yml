@@ -1,7 +1,7 @@
 services:
   app:
     build: .
-    image: slack_bot:latest
+    image: slack_muter:latest
     restart: unless-stopped
     env_file:
       - .env

@@ -1,4 +1,4 @@
-# SlackBot — Auto-Read Coworker Messages
+# Slack Muter — Auto-Read Coworker Messages
 
 A tiny Phoenix app that listens to Slack's Events API and auto-marks a
 specific coworker's messages as read in channels (not DMs/group DMs), but
@@ -105,11 +105,11 @@ Set these in the prod environment (Docker/Fly/wherever):
 
 Every push to `main` runs [`.github/workflows/build.yml`](.github/workflows/build.yml),
 which builds the Docker image and pushes it to GitHub Container Registry
-as `ghcr.io/szanzibar/slack_bot:latest` (also tagged with the commit
+as `ghcr.io/szanzibar/slack_muter:latest` (also tagged with the commit
 SHA). Layer caching is via GitHub Actions cache.
 
 The package is **private by default** — to let your server pull it
-without auth, go to <https://github.com/users/szanzibar/packages/container/slack_bot/settings>
+without auth, go to <https://github.com/users/szanzibar/packages/container/slack_muter/settings>
 and set Package Visibility → Public. (Alternatively, keep it private and
 `docker login ghcr.io -u szanzibar -p <PAT-with-read:packages>` on the
 server once.)
@@ -119,11 +119,11 @@ On the server, you only need two files: `docker-compose.prod.yml` and
 
 ```sh
 # First time only — bootstrap the directory:
-mkdir -p slack_bot && cd slack_bot
+mkdir -p slack_muter && cd slack_muter
 mkdir -p logs && chmod 777 logs
 
 # Grab the standalone compose file:
-curl -O https://raw.githubusercontent.com/szanzibar/slack_bot/main/docker-compose.prod.yml
+curl -O https://raw.githubusercontent.com/szanzibar/slack_muter/main/docker-compose.prod.yml
 
 # Create your .env (see "Required environment variables" above):
 cat > .env <<'EOF'

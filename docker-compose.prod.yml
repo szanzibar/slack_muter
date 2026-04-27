@@ -4,7 +4,7 @@
 # && docker compose -f docker-compose.prod.yml up -d`.
 services:
   app:
-    image: ghcr.io/szanzibar/slack_bot:latest
+    image: ghcr.io/szanzibar/slack_muter:latest
     pull_policy: always
     restart: unless-stopped
     env_file:
