@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    image: slack_bot:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Tell the Phoenix release to actually start the endpoint (runtime.exs
+      # only sets `server: true` when PHX_SERVER is set).
+      PHX_SERVER: "true"
+    ports:
+      # Compose interpolates ${PORT} from the same .env file at parse time.
+      - "${PORT:-4000}:${PORT:-4000}"
