@@ -15,23 +15,51 @@ defmodule SlackBot.LoggerHandler do
 
   @doc false
   def log(%{level: level, msg: msg, meta: meta}, _config) do
-    iodata = [
-      format_timestamp(meta),
-      ?\s,
-      ?[,
-      Atom.to_string(level),
-      ?],
-      ?\s,
-      format_msg(msg),
-      ?\n
-    ]
+    text = msg |> format_msg() |> to_binary()
 
-    SlackBot.EventLogger.write_line(IO.iodata_to_binary(iodata))
+    unless request_log?(text) do
+      line =
+        IO.iodata_to_binary([
+          format_timestamp(meta),
+          " [",
+          Atom.to_string(level),
+          "] ",
+          text,
+          ?\n
+        ])
+
+      SlackBot.EventLogger.write_line(line)
+    end
   rescue
     _ -> :ok
   catch
     _, _ -> :ok
   end
+
+  @doc """
+  True for the per-request log lines emitted by `Plug.Logger`
+  (`"POST /…"`, `"Sent 200 in 443µs"`, etc.). The file log is meant to be
+  a focused audit trail; the request firehose is left to stdout/docker
+  compose logs. Public for direct testing.
+  """
+  @spec request_log?(binary()) :: boolean()
+  def request_log?(text) when is_binary(text) do
+    String.starts_with?(text, [
+      "GET ",
+      "POST ",
+      "PUT ",
+      "PATCH ",
+      "DELETE ",
+      "HEAD ",
+      "OPTIONS ",
+      "Sent "
+    ])
+  end
+
+  def request_log?(_), do: false
+
+  defp to_binary(b) when is_binary(b), do: b
+  defp to_binary(io), do: IO.iodata_to_binary(io)
 
   defp format_msg({:string, str}), do: str
   defp format_msg({:report, report}), do: inspect(report)

@@ -75,6 +75,15 @@ defmodule SlackBot.EventLoggerTest do
       assert contents =~ marker
       assert contents =~ "[warning]"
     end
+
+    test "Plug request lines are recognized as request logs (filtered out)" do
+      assert SlackBot.LoggerHandler.request_log?("POST /slack/events")
+      assert SlackBot.LoggerHandler.request_log?("GET /healthz")
+      assert SlackBot.LoggerHandler.request_log?("Sent 200 in 443µs")
+      refute SlackBot.LoggerHandler.request_log?("marked channel C123 read up to 1700...")
+      refute SlackBot.LoggerHandler.request_log?("EventLogger writing to /app/log/...")
+      refute SlackBot.LoggerHandler.request_log?("")
+    end
   end
 
   describe "cleanup_old/1" do
