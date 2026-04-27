@@ -88,14 +88,72 @@ mark decision.
 
 ## Deployment
 
+### Required environment variables
+
 Set these in the prod environment (Docker/Fly/wherever):
 
-| Variable               | Purpose                                                      |
-|------------------------|--------------------------------------------------------------|
-| `SLACK_SIGNING_SECRET` | Verify inbound Slack webhooks                                |
-| `SLACK_USER_TOKEN`     | `xoxp-…` — calls `conversations.{info,history,mark}`         |
-| `TARGET_SLACK_USER_IDS`| Comma-separated coworker member IDs whose posts get auto-read|
-| `PHX_HOST`             | Hostname Phoenix advertises (also Slack's Request URL host)  |
-| `SECRET_KEY_BASE`      | Phoenix cookie/session secret. `mix phx.gen.secret`          |
-| `PORT`                 | HTTP port (default 4000)                                     |
-| `PHX_SERVER`           | Set to `true` when running via `mix release`                 |
+| Variable                | Purpose                                                                |
+|-------------------------|------------------------------------------------------------------------|
+| `SLACK_SIGNING_SECRET`  | Verify inbound Slack webhooks                                          |
+| `SLACK_USER_TOKEN`      | `xoxp-…` — calls `conversations.{info,history,mark}`                   |
+| `TARGET_SLACK_USER_IDS` | Comma-separated coworker member IDs whose posts get auto-read          |
+| `PHX_HOST`              | Hostname Phoenix advertises (also Slack's Request URL host)            |
+| `SECRET_KEY_BASE`       | Phoenix cookie/session secret. `mix phx.gen.secret`                    |
+| `PORT`                  | Host-side port docker-compose binds to (container always uses 4000)    |
+
+### Deploy from the prebuilt image (recommended)
+
+Every push to `main` runs [`.github/workflows/build.yml`](.github/workflows/build.yml),
+which builds the Docker image and pushes it to GitHub Container Registry
+as `ghcr.io/szanzibar/slack_bot:latest` (also tagged with the commit
+SHA). Layer caching is via GitHub Actions cache.
+
+The package is **private by default** — to let your server pull it
+without auth, go to <https://github.com/users/szanzibar/packages/container/slack_bot/settings>
+and set Package Visibility → Public. (Alternatively, keep it private and
+`docker login ghcr.io -u szanzibar -p <PAT-with-read:packages>` on the
+server once.)
+
+On the server, you only need two files: `docker-compose.prod.yml` and
+`.env`. No source checkout required.
+
+```sh
+# First time only — bootstrap the directory:
+mkdir -p slack_bot && cd slack_bot
+mkdir -p logs && chmod 777 logs
+
+# Grab the standalone compose file:
+curl -O https://raw.githubusercontent.com/szanzibar/slack_bot/main/docker-compose.prod.yml
+
+# Create your .env (see "Required environment variables" above):
+cat > .env <<'EOF'
+SLACK_SIGNING_SECRET=
+SLACK_USER_TOKEN=
+TARGET_SLACK_USER_IDS=
+PHX_HOST=
+SECRET_KEY_BASE=
+PORT=4000
+EOF
+$EDITOR .env
+
+# Bring it up:
+docker compose -f docker-compose.prod.yml up -d
+```
+
+To update later:
+
+```sh
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+`pull_policy: always` is set in the compose file, so a plain
+`docker compose -f docker-compose.prod.yml up -d --force-recreate` also
+fetches the latest tag.
+
+### Deploy from source (build on the server)
+
+If you'd rather build locally on the server (e.g. for an
+unmerged branch) the original [`docker-compose.yml`](docker-compose.yml)
++ [`deploy.sh`](deploy.sh) flow still works: `git pull && docker compose
+build && docker compose up -d`, all wrapped in `./deploy.sh`.

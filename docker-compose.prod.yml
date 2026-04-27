@@ -1,0 +1,31 @@
+# Standalone compose file for running the prebuilt image from GHCR.
+# Drop this on a server alongside `.env` and `logs/` — no source checkout
+# needed. Update with: `docker compose -f docker-compose.prod.yml pull
+# && docker compose -f docker-compose.prod.yml up -d`.
+services:
+  app:
+    image: ghcr.io/szanzibar/slack_bot:latest
+    pull_policy: always
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Tell the Phoenix release to actually start the endpoint (runtime.exs
+      # only sets `server: true` when PHX_SERVER is set).
+      PHX_SERVER: "true"
+      # Container always listens on 4000. PORT in .env is host-side only —
+      # this override prevents env_file from leaking it into the container.
+      PORT: "4000"
+      # Absolute path matching the bind-mount below. Without this the app
+      # would write to /app/bin/log (CWD-relative) instead of the mount.
+      EVENT_LOG_DIR: /app/log
+    ports:
+      # Compose reads .env for ${PORT} interpolation. This is the host port
+      # the reverse proxy points at; the container side is always 4000.
+      - "${PORT:-4000}:4000"
+    volumes:
+      # Persist Slack event logs to the host so rebuilds don't nuke them
+      # and you can `tail -f` from the host. The container writes as
+      # `nobody` (UID 65534) — make sure ./logs is writable by it
+      # (`mkdir -p logs && chmod 777 logs` works).
+      - ./logs:/app/log
