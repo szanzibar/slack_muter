@@ -29,7 +29,7 @@ defmodule SlackBotWeb.SlackController do
   def events(conn, %{"type" => "event_callback", "event" => event}) do
     if Map.get(event, "type") == "message", do: EventLogger.log_event(event)
 
-    if should_handle?(event, target_user_id()) do
+    if should_handle?(event, target_user_ids()) do
       Task.Supervisor.start_child(SlackBot.TaskSupervisor, fn ->
         EventHandler.handle_message(event)
       end)
@@ -43,19 +43,20 @@ defmodule SlackBotWeb.SlackController do
   @doc false
   # Public for direct testing — keeps the dispatch rules isolated from
   # signature/HTTP concerns.
-  def should_handle?(event, target_user_id \\ target_user_id())
+  def should_handle?(event, target_user_ids \\ target_user_ids())
 
-  def should_handle?(%{"type" => "message"} = event, target_user_id) do
+  def should_handle?(%{"type" => "message"} = event, target_user_ids)
+      when is_list(target_user_ids) do
     is_nil(Map.get(event, "subtype")) and
       is_nil(Map.get(event, "thread_ts")) and
       Map.get(event, "channel_type") not in @ignored_channel_types and
-      Map.get(event, "user") == target_user_id
+      Map.get(event, "user") in target_user_ids
   end
 
-  def should_handle?(_, _target_user_id), do: false
+  def should_handle?(_, _target_user_ids), do: false
 
-  defp target_user_id do
+  defp target_user_ids do
     Application.get_env(:slack_bot, :slack, [])
-    |> Keyword.get(:target_user_id)
+    |> Keyword.get(:target_user_ids, [])
   end
 end

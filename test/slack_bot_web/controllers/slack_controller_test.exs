@@ -5,6 +5,8 @@ defmodule SlackBotWeb.SlackControllerTest do
 
   @signing_secret "test_signing_secret"
   @target_user "U_TARGET"
+  @other_target "U_TARGET_2"
+  @targets [@target_user, @other_target]
 
   setup do
     prev = Application.get_env(:slack_bot, :slack, [])
@@ -12,7 +14,7 @@ defmodule SlackBotWeb.SlackControllerTest do
     Application.put_env(:slack_bot, :slack,
       signing_secret: @signing_secret,
       user_token: "xoxp-test",
-      target_user_id: @target_user
+      target_user_ids: @targets
     )
 
     on_exit(fn -> Application.put_env(:slack_bot, :slack, prev) end)
@@ -117,7 +119,7 @@ defmodule SlackBotWeb.SlackControllerTest do
                  "user" => @target_user,
                  "ts" => "1700000000.000100"
                },
-               @target_user
+               @targets
              )
     end
 
@@ -129,7 +131,7 @@ defmodule SlackBotWeb.SlackControllerTest do
                  "user" => @target_user,
                  "ts" => "1700000000.000100"
                },
-               @target_user
+               @targets
              )
     end
 
@@ -141,7 +143,7 @@ defmodule SlackBotWeb.SlackControllerTest do
                  "user" => @target_user,
                  "ts" => "1700000000.000100"
                },
-               @target_user
+               @targets
              )
     end
 
@@ -153,7 +155,7 @@ defmodule SlackBotWeb.SlackControllerTest do
                  "channel_type" => "channel",
                  "user" => @target_user
                },
-               @target_user
+               @targets
              )
     end
 
@@ -166,7 +168,7 @@ defmodule SlackBotWeb.SlackControllerTest do
                  "ts" => "1700000001.000200",
                  "thread_ts" => "1700000000.000100"
                },
-               @target_user
+               @targets
              )
     end
 
@@ -177,14 +179,40 @@ defmodule SlackBotWeb.SlackControllerTest do
                  "channel_type" => "channel",
                  "user" => "U_OTHER"
                },
-               @target_user
+               @targets
              )
     end
 
     test "false for non-message event types" do
       refute SlackController.should_handle?(
                %{"type" => "reaction_added", "user" => @target_user},
-               @target_user
+               @targets
+             )
+    end
+
+    test "true when user matches any of multiple configured targets" do
+      assert SlackController.should_handle?(
+               %{
+                 "type" => "message",
+                 "channel" => "C1",
+                 "channel_type" => "channel",
+                 "user" => @other_target,
+                 "ts" => "1700000000.000100"
+               },
+               @targets
+             )
+    end
+
+    test "false with empty target list" do
+      refute SlackController.should_handle?(
+               %{
+                 "type" => "message",
+                 "channel" => "C1",
+                 "channel_type" => "channel",
+                 "user" => @target_user,
+                 "ts" => "1700000000.000100"
+               },
+               []
              )
     end
   end

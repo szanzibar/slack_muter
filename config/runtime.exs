@@ -8,10 +8,17 @@ end
 
 # Slack auto-read configuration. These are read in every environment so
 # tests can override them via System.put_env/2 in setup blocks.
+target_user_ids =
+  case System.get_env("TARGET_SLACK_USER_IDS") do
+    nil -> []
+    "" -> []
+    str -> str |> String.split(",", trim: true) |> Enum.map(&String.trim/1)
+  end
+
 config :slack_bot, :slack,
   signing_secret: System.get_env("SLACK_SIGNING_SECRET"),
   user_token: System.get_env("SLACK_USER_TOKEN"),
-  target_user_id: System.get_env("TARGET_SLACK_USER_ID")
+  target_user_ids: target_user_ids
 
 # Absolute path to the event-log directory. Set explicitly in the
 # container (the Phoenix release boots with CWD=/app/bin, which would

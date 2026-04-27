@@ -1,20 +1,22 @@
 defmodule SlackBot.EventHandler do
   @moduledoc """
   Decides whether to mark a Slack channel as read in response to a message
-  event from the target user, and performs the mark when appropriate.
+  event from one of the configured target users, and performs the mark
+  when appropriate.
 
   Lives behind `Task.Supervisor` so the controller can return 200 within
   Slack's 3-second window while the API round-trips happen async.
 
-  Pre-filtering (channel_type, subtype, thread_ts, user match) happens in the
-  controller — this module assumes the event is already a top-level message
-  from the target user in a channel/group worth processing.
+  Pre-filtering (channel_type, subtype, thread_ts, target-user-match) happens
+  in the controller — this module assumes the event is already a top-level
+  message from a configured target user in a channel/group worth processing.
 
-  Race-condition note: when multiple messages from the target arrive in quick
-  succession, an in-flight `conversations.mark` may not have landed before we
-  check `last_read` for the next event. So we don't reject just because there
-  is *something* unread between `last_read` and `event.ts` — we look at the
-  unread messages and only abstain if any are from a non-target user.
+  Race-condition note: when multiple messages from target users arrive in
+  quick succession, an in-flight `conversations.mark` may not have landed
+  before we check `last_read` for the next event. So we don't reject just
+  because there is *something* unread between `last_read` and `event.ts` —
+  we look at the unread messages and only abstain if any are from a user
+  outside the configured target list.
   """
 
   require Logger
@@ -28,13 +30,13 @@ defmodule SlackBot.EventHandler do
   @history_limit 20
 
   @spec handle_message(map()) :: :ok
-  def handle_message(%{"channel" => channel, "ts" => event_ts, "user" => user} = _event) do
+  def handle_message(%{"channel" => channel, "ts" => event_ts} = _event) do
     with {:ok, info} <- SlackClient.conversations_info(channel),
          {:ok, last_read} <- fetch_last_read(info),
          :continue <- compare_ts(last_read, event_ts),
          {:ok, between} <-
            SlackClient.conversations_history(channel, last_read, event_ts, @history_limit),
-         :ok <- check_only_target_user(between, user) do
+         :ok <- check_only_target_users(between, target_user_ids()) do
       case SlackClient.conversations_mark(channel, event_ts) do
         :ok ->
           Logger.info("marked channel #{channel} read up to #{event_ts}")
@@ -72,8 +74,8 @@ defmodule SlackBot.EventHandler do
     end
   end
 
-  defp check_only_target_user(messages, target_user) do
-    if only_target_user?(messages, target_user) do
+  defp check_only_target_users(messages, target_user_ids) do
+    if only_target_users?(messages, target_user_ids) do
       :ok
     else
       :skip_other_user_unread
@@ -81,12 +83,17 @@ defmodule SlackBot.EventHandler do
   end
 
   @doc """
-  True iff every message in `messages` was authored by `target_user`. Public
-  for direct testing of the race-aware mark rule — keeps the decision logic
-  unit-testable without HTTP mocking.
+  True iff every message in `messages` was authored by a user in
+  `target_user_ids`. Public for direct testing of the race-aware mark
+  rule — keeps the decision logic unit-testable without HTTP mocking.
   """
-  @spec only_target_user?([map()], String.t()) :: boolean()
-  def only_target_user?(messages, target_user) do
-    Enum.all?(messages, fn msg -> Map.get(msg, "user") == target_user end)
+  @spec only_target_users?([map()], [String.t()]) :: boolean()
+  def only_target_users?(messages, target_user_ids) do
+    Enum.all?(messages, fn msg -> Map.get(msg, "user") in target_user_ids end)
+  end
+
+  defp target_user_ids do
+    Application.get_env(:slack_bot, :slack, [])
+    |> Keyword.get(:target_user_ids, [])
   end
 end

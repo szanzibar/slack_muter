@@ -52,8 +52,10 @@ read it yourself.
    `SLACK_USER_TOKEN`.
 5. **Basic Information → App Credentials → Signing Secret** → copy into
    `SLACK_SIGNING_SECRET`.
-6. Find the target coworker's member ID (their Slack profile → `…` →
-   *Copy member ID*) and put it in `TARGET_SLACK_USER_ID`.
+6. Find each target coworker's member ID (their Slack profile → `…` →
+   *Copy member ID*) and put a comma-separated list in
+   `TARGET_SLACK_USER_IDS` — e.g. `U01ABC12345,U02DEF67890`. A single ID
+   works fine; whitespace around commas is trimmed.
 
 > The bot token (`xoxb-`) is **not used**. `conversations.mark` only
 > works as the real user, so all API calls go out with the user token.
@@ -92,7 +94,7 @@ Set these in the prod environment (Docker/Fly/wherever):
 |------------------------|--------------------------------------------------------------|
 | `SLACK_SIGNING_SECRET` | Verify inbound Slack webhooks                                |
 | `SLACK_USER_TOKEN`     | `xoxp-…` — calls `conversations.{info,history,mark}`         |
-| `TARGET_SLACK_USER_ID` | The coworker whose channel posts get auto-read               |
+| `TARGET_SLACK_USER_IDS`| Comma-separated coworker member IDs whose posts get auto-read|
 | `PHX_HOST`             | Hostname Phoenix advertises (also Slack's Request URL host)  |
 | `SECRET_KEY_BASE`      | Phoenix cookie/session secret. `mix phx.gen.secret`          |
 | `PORT`                 | HTTP port (default 4000)                                     |
