@@ -31,7 +31,7 @@ defmodule SlackBot.EventHandler do
 
   @type outcome ::
           {:ok, :marked}
-          | {:skip, :already_read | :not_member | :other_user_unread}
+          | {:skip, :not_member | :other_user_unread}
           | {:error, term()}
 
   @spec handle_message(map()) :: outcome
@@ -45,16 +45,11 @@ defmodule SlackBot.EventHandler do
          :ok <- check_is_member(info),
          :ok <- log_member_event(event),
          {:ok, last_read} <- fetch_last_read(info),
-         :continue <- compare_ts(last_read, event_ts),
          {:ok, between} <-
            SlackClient.conversations_history(channel, last_read, event_ts, @history_limit),
          :ok <- check_only_target_users(between, target_user_ids()) do
       do_mark(channel, event_ts)
     else
-      :skip_already_read ->
-        Logger.info("skipping #{channel}@#{event_ts}: already read (last_read >= event_ts)")
-        {:skip, :already_read}
-
       :skip_not_member ->
         Logger.info("skipping #{channel}: not a member")
         {:skip, :not_member}
@@ -127,15 +122,6 @@ defmodule SlackBot.EventHandler do
   defp log_member_event(event) do
     EventLogger.log_event(event)
     :ok
-  end
-
-  # Slack ts strings sort lexicographically when zero-padded — they always
-  # are (e.g. "1700000000.000123"), so plain string compare is correct.
-  defp compare_ts(last_read, event_ts) do
-    cond do
-      last_read >= event_ts -> :skip_already_read
-      true -> :continue
-    end
   end
 
   defp check_only_target_users(messages, target_user_ids) do
