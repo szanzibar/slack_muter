@@ -27,10 +27,14 @@ defmodule SlackBotWeb.SlackController do
   end
 
   def events(conn, %{"type" => "event_callback", "event" => event}) do
-    if should_handle?(event, target_user_ids()) do
+    target_ids = target_user_ids()
+
+    if should_handle?(event, target_ids) do
       Task.Supervisor.start_child(SlackBot.TaskSupervisor, fn ->
         EventHandler.handle_message(event)
       end)
+    else
+      log_filter_miss(event, target_ids)
     end
 
     send_resp(conn, 200, "")
@@ -52,6 +56,25 @@ defmodule SlackBotWeb.SlackController do
   end
 
   def should_handle?(_, _target_user_ids), do: false
+
+  # Diagnostic: emits an info line for every type=message event that we
+  # rejected, with the four fields should_handle? checks. Helps explain
+  # "why didn't the bot react to my coworker's message?" by showing what
+  # Slack actually delivered (subtype, thread_ts, channel_type, user).
+  # Limited to message events to avoid logging unrelated event types.
+  defp log_filter_miss(%{"type" => "message"} = event, target_ids) do
+    Logger.info(
+      "filtered message: " <>
+        "channel=#{inspect(Map.get(event, "channel"))} " <>
+        "user=#{inspect(Map.get(event, "user"))} " <>
+        "in_targets=#{inspect(Map.get(event, "user") in target_ids)} " <>
+        "channel_type=#{inspect(Map.get(event, "channel_type"))} " <>
+        "subtype=#{inspect(Map.get(event, "subtype"))} " <>
+        "thread_ts=#{inspect(Map.get(event, "thread_ts"))}"
+    )
+  end
+
+  defp log_filter_miss(_event, _target_ids), do: :ok
 
   defp target_user_ids do
     Application.get_env(:slack_bot, :slack, [])

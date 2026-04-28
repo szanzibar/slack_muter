@@ -76,6 +76,41 @@ To expose your local server to Slack during development, use a tunnel
 (ngrok, cloudflared, etc.) and set the resulting URL as your app's
 Request URL.
 
+### Local debug endpoint
+
+`POST /dev/slack/events` is mounted only when `dev_routes` is enabled
+(local dev — never prod) and **bypasses Slack signature verification**.
+It runs the same pipeline production uses, synchronously, and returns a
+JSON outcome — useful for figuring out why a real event was filtered.
+
+```sh
+# Run the same path as prod (mode: "normal", default).
+# Tells you exactly which branch fired: marked / already_read /
+# not_member / other_user_unread / error.
+curl -s -X POST http://localhost:4000/dev/slack/events \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "channel": "C0AQ0ALTE3S",
+    "user": "U01ABC12345",
+    "ts": "1745786361.000300"
+  }' | jq
+
+# Force a mark even on an already-read channel (skips the
+# already_read / race-aware checks). Useful for verifying the
+# conversations.mark API path / scopes / token end-to-end.
+curl -s -X POST http://localhost:4000/dev/slack/events \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "channel": "C0AQ0ALTE3S",
+    "user": "U01ABC12345",
+    "ts": "1745786361.000300",
+    "mode": "force"
+  }' | jq
+```
+
+Tail `log/events-$(date -u +%F).log` while you run these — every dev
+event still goes through the same logging path as a real one.
+
 ## Tests
 
 ```sh

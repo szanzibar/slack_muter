@@ -29,8 +29,18 @@ defmodule SlackBot.EventHandler do
   # potentially missed content.
   @history_limit 20
 
-  @spec handle_message(map()) :: :ok
+  @type outcome ::
+          {:ok, :marked}
+          | {:skip, :already_read | :not_member | :other_user_unread}
+          | {:error, term()}
+
+  @spec handle_message(map()) :: outcome
   def handle_message(%{"channel" => channel, "ts" => event_ts} = event) do
+    Logger.info(
+      "processing target-user event: user=#{Map.get(event, "user")} " <>
+        "channel=#{channel} ts=#{event_ts}"
+    )
+
     with {:ok, info} <- SlackClient.conversations_info(channel),
          :ok <- check_is_member(info),
          :ok <- log_member_event(event),
@@ -39,30 +49,62 @@ defmodule SlackBot.EventHandler do
          {:ok, between} <-
            SlackClient.conversations_history(channel, last_read, event_ts, @history_limit),
          :ok <- check_only_target_users(between, target_user_ids()) do
-      case SlackClient.conversations_mark(channel, event_ts) do
-        :ok ->
-          Logger.info("marked channel #{channel} read up to #{event_ts}")
-          :ok
-
-        {:error, reason} ->
-          Logger.warning("conversations.mark failed for #{channel}: #{inspect(reason)}")
-          :ok
-      end
+      do_mark(channel, event_ts)
     else
       :skip_already_read ->
-        :ok
+        Logger.info("skipping #{channel}@#{event_ts}: already read (last_read >= event_ts)")
+        {:skip, :already_read}
 
       :skip_not_member ->
-        Logger.debug("skipping #{channel}: not a member")
-        :ok
+        Logger.info("skipping #{channel}: not a member")
+        {:skip, :not_member}
 
       :skip_other_user_unread ->
-        Logger.debug("skipping #{channel}@#{event_ts}: non-target unread content present")
-        :ok
+        Logger.info("skipping #{channel}@#{event_ts}: non-target unread content present")
+        {:skip, :other_user_unread}
 
-      {:error, reason} ->
+      {:error, reason} = err ->
         Logger.warning("event handling failed for #{channel}@#{event_ts}: #{inspect(reason)}")
-        :ok
+        err
+    end
+  end
+
+  @doc """
+  Diagnostic / dev variant. Skips the smart-skip checks (`compare_ts`
+  early-return for already-read channels, race-aware target-user-only
+  filter) and goes straight to `conversations.mark` after confirming
+  membership. Used by the dev test endpoint to verify the API path
+  works end-to-end against channels that are already at `last_read`.
+  Still respects the membership check — marking a channel you're not in
+  would always 403 from Slack.
+  """
+  @spec force_mark(map()) :: outcome
+  def force_mark(%{"channel" => channel, "ts" => event_ts} = event) do
+    with {:ok, info} <- SlackClient.conversations_info(channel),
+         :ok <- check_is_member(info),
+         :ok <- log_member_event(event) do
+      Logger.info("[force] proceeding to mark #{channel} up to #{event_ts}")
+      do_mark(channel, event_ts)
+    else
+      :skip_not_member ->
+        Logger.debug("[force] skipping #{channel}: not a member")
+        {:skip, :not_member}
+
+      {:error, reason} = err ->
+        Logger.warning("[force] failed for #{channel}@#{event_ts}: #{inspect(reason)}")
+        err
+    end
+  end
+
+  defp do_mark(channel, event_ts) do
+    case SlackClient.conversations_mark(channel, event_ts) do
+      :ok ->
+        Logger.info("marked channel #{channel} read up to #{event_ts}")
+        {:ok, :marked}
+
+      {:error, reason} = err ->
+        Logger.warning("conversations.mark failed for #{channel}: #{inspect(reason)}")
+        err
     end
   end
 

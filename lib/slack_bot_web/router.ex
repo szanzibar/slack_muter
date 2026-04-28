@@ -46,5 +46,12 @@ defmodule SlackBotWeb.Router do
       live_dashboard "/dashboard", metrics: SlackBotWeb.Telemetry
       forward "/mailbox", Plug.Swoosh.MailboxPreview
     end
+
+    # Diagnostic endpoint to simulate Slack events without signature
+    # verification — see SlackBotWeb.DevController for the request shape.
+    scope "/dev/slack", SlackBotWeb do
+      pipe_through :api
+      post "/events", DevController, :events
+    end
   end
 end
