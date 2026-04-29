@@ -147,19 +147,65 @@ defmodule SlackBotWeb.SlackControllerTest do
              )
     end
 
-    test "false when subtype is present (edits, joins, bot messages)" do
-      refute SlackController.should_handle?(
+    test "false for system / edit subtypes (message_changed, channel_join, bot_message)" do
+      for subtype <- ["message_changed", "channel_join", "bot_message", "message_deleted"] do
+        refute SlackController.should_handle?(
+                 %{
+                   "type" => "message",
+                   "subtype" => subtype,
+                   "channel_type" => "channel",
+                   "user" => @target_user
+                 },
+                 @targets
+               ),
+               "expected subtype #{subtype} to be filtered"
+      end
+    end
+
+    test "true for file_share at the top level" do
+      assert SlackController.should_handle?(
                %{
                  "type" => "message",
-                 "subtype" => "message_changed",
+                 "subtype" => "file_share",
+                 "channel" => "C1",
                  "channel_type" => "channel",
-                 "user" => @target_user
+                 "user" => @target_user,
+                 "ts" => "1700000000.000100"
                },
                @targets
              )
     end
 
-    test "false when thread_ts is present (thread reply)" do
+    test "false for file_share inside a thread (can't mark threads via API)" do
+      refute SlackController.should_handle?(
+               %{
+                 "type" => "message",
+                 "subtype" => "file_share",
+                 "channel_type" => "channel",
+                 "user" => @target_user,
+                 "thread_ts" => "1700000000.000100",
+                 "ts" => "1700000001.000200"
+               },
+               @targets
+             )
+    end
+
+    test "true for thread_broadcast (thread reply also posted to channel)" do
+      assert SlackController.should_handle?(
+               %{
+                 "type" => "message",
+                 "subtype" => "thread_broadcast",
+                 "channel" => "C1",
+                 "channel_type" => "channel",
+                 "user" => @target_user,
+                 "thread_ts" => "1700000000.000100",
+                 "ts" => "1700000001.000200"
+               },
+               @targets
+             )
+    end
+
+    test "false for plain thread replies (subtype=nil, thread_ts set)" do
       refute SlackController.should_handle?(
                %{
                  "type" => "message",

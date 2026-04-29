@@ -49,13 +49,35 @@ defmodule SlackBotWeb.SlackController do
 
   def should_handle?(%{"type" => "message"} = event, target_user_ids)
       when is_list(target_user_ids) do
-    is_nil(Map.get(event, "subtype")) and
-      is_nil(Map.get(event, "thread_ts")) and
+    Map.get(event, "user") in target_user_ids and
       Map.get(event, "channel_type") not in @ignored_channel_types and
-      Map.get(event, "user") in target_user_ids
+      processable_message?(event)
   end
 
   def should_handle?(_, _target_user_ids), do: false
+
+  # Slack delivers a lot of subtype variants — some are real user content
+  # (file upload, /me, broadcasted thread reply) that we want to process,
+  # others are system noise (edits, joins, bot proxies) that we don't.
+  # Allowlist subtypes we want to act on, plus the nil case (a plain
+  # top-level message). Plain thread replies (subtype=nil, thread_ts set)
+  # are filtered out because Slack's public API has no way to mark them
+  # as read — only conversations.mark which is channel-level only.
+  defp processable_message?(event) do
+    subtype = Map.get(event, "subtype")
+    in_thread? = not is_nil(Map.get(event, "thread_ts"))
+
+    case subtype do
+      nil -> not in_thread?
+      "file_share" -> not in_thread?
+      "me_message" -> not in_thread?
+      # Thread reply that was *also* posted to the channel feed — appears
+      # to readers as a regular channel message, so worth marking.
+      "thread_broadcast" -> true
+      "reply_broadcast" -> true
+      _ -> false
+    end
+  end
 
   # Diagnostic: emits an info line for every type=message event that we
   # rejected, with the four fields should_handle? checks. Helps explain
