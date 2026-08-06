@@ -58,6 +58,14 @@ defmodule SlackBot.SlackClient do
     end
   end
 
+  @spec conversations_kick(channel, String.t()) :: :ok | {:error, term()}
+  def conversations_kick(channel, user) do
+    case post("conversations.kick", %{channel: channel, user: user}) do
+      {:ok, _} -> :ok
+      {:error, _} = err -> err
+    end
+  end
+
   defp post(method, params) do
     url = base_url() <> "/" <> method
     token = user_token()

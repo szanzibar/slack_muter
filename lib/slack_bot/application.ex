@@ -14,7 +14,10 @@ defmodule SlackBot.Application do
       {Task.Supervisor, name: SlackBot.TaskSupervisor},
       SlackBot.EventLogger,
       # Start to serve requests, typically the last entry
-      SlackBotWeb.Endpoint
+      SlackBotWeb.Endpoint,
+      # One-shot boot sweep: kick configured users already in guarded
+      # channels. :temporary by default, so a failure doesn't cycle the app.
+      {Task, &SlackBot.ChannelKicker.kick_all/0}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

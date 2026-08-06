@@ -45,7 +45,8 @@ read it yourself.
      `https://YOUR_HOST/slack/events`. Slack pings it with a
      `url_verification` challenge — the app handles that automatically.
    - Subscribe to events on behalf of users:
-     `message.channels`, `message.groups`.
+     `message.channels`, `message.groups`, and (for the channel kicker)
+     `member_joined_channel`.
      (Do NOT subscribe to `message.im` or `message.mpim` — we ignore
      DMs and group DMs.)
 4. **Install App** → copy the **User OAuth Token** (`xoxp-…`) into
@@ -59,6 +60,30 @@ read it yourself.
 
 > The bot token (`xoxb-`) is **not used**. `conversations.mark` only
 > works as the real user, so all API calls go out with the user token.
+
+## Channel kicker
+
+Optional second feature: when a user listed in `KICK_SLACK_USER_IDS`
+joins a channel listed in `KICK_CHANNEL_IDS`, they are immediately
+removed via `conversations.kick`. Both are comma-separated ID lists;
+leave either empty to disable.
+
+The app also runs a one-shot sweep on boot, kicking every listed user
+from every listed channel, so anyone already present before the app
+started doesn't linger. Absent users come back as `not_in_channel`,
+which is treated as success.
+
+Gotchas that bit in practice:
+
+- The `member_joined_channel` event subscription must be added under
+  **Subscribe to events on behalf of users** (it's covered by the
+  `channels:read`/`groups:read` scopes already listed above, so no
+  reinstall) — and you must hit **Save Changes**, or joins are silently
+  never delivered.
+- A `{:slack_error, "restricted_action"}` log means a workspace
+  preference blocks the token's user from removing channel members
+  (*Workspace settings → Permissions → Channel management*). That has
+  to be fixed by a workspace admin; no scope or code change helps.
 
 ## Local development
 

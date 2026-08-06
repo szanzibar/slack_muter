@@ -18,7 +18,7 @@ defmodule SlackBotWeb.SlackController do
 
   require Logger
 
-  alias SlackBot.EventHandler
+  alias SlackBot.{ChannelKicker, EventHandler}
 
   @ignored_channel_types ~w(im mpim)
 
@@ -29,12 +29,19 @@ defmodule SlackBotWeb.SlackController do
   def events(conn, %{"type" => "event_callback", "event" => event}) do
     target_ids = target_user_ids()
 
-    if should_handle?(event, target_ids) do
-      Task.Supervisor.start_child(SlackBot.TaskSupervisor, fn ->
-        EventHandler.handle_message(event)
-      end)
-    else
-      log_filter_miss(event, target_ids)
+    cond do
+      ChannelKicker.should_kick?(event) ->
+        Task.Supervisor.start_child(SlackBot.TaskSupervisor, fn ->
+          ChannelKicker.kick(event)
+        end)
+
+      should_handle?(event, target_ids) ->
+        Task.Supervisor.start_child(SlackBot.TaskSupervisor, fn ->
+          EventHandler.handle_message(event)
+        end)
+
+      true ->
+        log_filter_miss(event, target_ids)
     end
 
     send_resp(conn, 200, "")

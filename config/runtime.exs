@@ -6,19 +6,20 @@ if config_env() != :prod and File.exists?(".env") do
   DotenvParser.load_file(".env")
 end
 
-# Slack auto-read configuration. These are read in every environment so
+# Slack configuration. These are read in every environment so
 # tests can override them via System.put_env/2 in setup blocks.
-target_user_ids =
-  case System.get_env("TARGET_SLACK_USER_IDS") do
-    nil -> []
-    "" -> []
-    str -> str |> String.split(",", trim: true) |> Enum.map(&String.trim/1)
-  end
+parse_ids = fn var ->
+  (System.get_env(var) || "")
+  |> String.split(",", trim: true)
+  |> Enum.map(&String.trim/1)
+end
 
 config :slack_bot, :slack,
   signing_secret: System.get_env("SLACK_SIGNING_SECRET"),
   user_token: System.get_env("SLACK_USER_TOKEN"),
-  target_user_ids: target_user_ids
+  target_user_ids: parse_ids.("TARGET_SLACK_USER_IDS"),
+  kick_channel_ids: parse_ids.("KICK_CHANNEL_IDS"),
+  kick_user_ids: parse_ids.("KICK_SLACK_USER_IDS")
 
 # Absolute path to the event-log directory. Set explicitly in the
 # container (the Phoenix release boots with CWD=/app/bin, which would
